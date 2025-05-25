@@ -1,60 +1,108 @@
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
+import { Loader2 } from "lucide-react"
 
-export function RecentRequests() {
-  return (
-    <div className="space-y-8">
-      {recentRequests.map((request) => (
-        <div key={request.id} className="flex items-center">
-          <Avatar className="h-9 w-9 bg-green-100">
-            <AvatarFallback className="bg-green-100 text-green-800">{request.name.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div className="ml-4 space-y-1">
-            <p className="text-sm font-medium leading-none">{request.name}</p>
-            <p className="text-sm text-muted-foreground">{request.title}</p>
-          </div>
-          <div className="ml-auto">
-            <Badge
-              variant={request.status === "대기" ? "outline" : request.status === "승인" ? "success" : "destructive"}
-            >
-              {request.status}
-            </Badge>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
+interface Request {
+  dataRequestId: number
+  user: {
+    userId: number
+    email: string
+    username: string | null
+    password: string
+    role: number
+  }
+  purpose: string
+  title: string
+  content: string
+  uploadDate: string
+  fileUrl: string | null
+  reviewStatus: "PENDING" | "APPROVED" | "REJECTED"
+  reviewedBy: number | null
+  reviewDate: string | null
+  organization: string
+  userId: number
 }
 
-const recentRequests = [
-  {
-    id: "1",
-    name: "김철수",
-    title: "2023년 지역별 인구 통계 데이터 요청",
-    status: "대기",
-  },
-  {
-    id: "2",
-    name: "이영희",
-    title: "코로나19 백신 접종률 데이터 요청",
-    status: "승인",
-  },
-  {
-    id: "3",
-    name: "박지민",
-    title: "지난 5년간 대기 오염도 데이터 요청",
-    status: "대기",
-  },
-  {
-    id: "4",
-    name: "최민수",
-    title: "서울시 지하철 이용객 통계 데이터 요청",
-    status: "미승인",
-  },
-  {
-    id: "5",
-    name: "정다운",
-    title: "전국 초중고 학생 수 데이터 요청",
-    status: "대기",
-  },
-]
+interface RecentRequestsProps {
+  requests?: Request[]
+  isLoading?: boolean
+}
+
+export function RecentRequests({ requests = [], isLoading = false }: RecentRequestsProps) {
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "PENDING":
+        return (
+            <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+              대기
+            </Badge>
+        )
+      case "APPROVED":
+        return (
+            <Badge variant="success" className="bg-green-100 text-green-800 border-green-200">
+              승인
+            </Badge>
+        )
+      case "REJECTED":
+        return (
+            <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
+              미승인
+            </Badge>
+        )
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.toLocaleDateString("ko-KR", {
+      month: "2-digit",
+      day: "2-digit",
+    })
+  }
+
+  if (isLoading) {
+    return (
+        <div className="flex h-32 items-center justify-center">
+          <div className="flex items-center">
+            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            <span className="text-sm">로딩 중...</span>
+          </div>
+        </div>
+    )
+  }
+
+  if (requests.length === 0) {
+    return (
+        <div className="flex h-32 items-center justify-center">
+          <div className="text-center">
+            <div className="text-sm text-muted-foreground">최근 요청이 없습니다.</div>
+          </div>
+        </div>
+    )
+  }
+
+  return (
+      <div className="space-y-8">
+        {requests.map((request) => (
+            <div key={request.dataRequestId} className="flex items-center">
+              <Avatar className="h-9 w-9 bg-green-100">
+                <AvatarFallback className="bg-green-100 text-green-800">
+                  {request.user.username ? request.user.username.charAt(0) : request.user.email.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="ml-4 space-y-1 flex-1">
+                <p className="text-sm font-medium leading-none">{request.user.username || request.user.email}</p>
+                <p className="text-sm text-muted-foreground truncate">{request.title}</p>
+                <p className="text-xs text-muted-foreground">{request.organization}</p>
+              </div>
+              <div className="ml-auto flex flex-col items-end space-y-1">
+                {getStatusBadge(request.reviewStatus)}
+                <span className="text-xs text-muted-foreground">{formatDate(request.uploadDate)}</span>
+              </div>
+            </div>
+        ))}
+      </div>
+  )
+}
