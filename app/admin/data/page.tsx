@@ -28,8 +28,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { UploadIcon as FileUpload, Plus, Search, Trash2 } from "lucide-react"
-import { datasetApi, s3Api } from "@/lib/api"
+import { UploadIcon as FileUpload, Plus, Search, Trash2, Download } from "lucide-react"
+import { datasetApi } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 
 interface Dataset {
@@ -45,6 +45,7 @@ interface Dataset {
   keyword: string | null
   analysis: string | null
   name: string
+  s3Key: string
   datasetTheme: {
     datasetThemeId: number
     theme: string
@@ -52,6 +53,12 @@ interface Dataset {
     dataYear: string | null
     fileType: string | null
     id: number
+  }
+  resource: {
+    resourceId: number
+    resourceName: string
+    type: string
+    resourceUrl: string
   }
   downloadSet: any[]
 }
@@ -63,26 +70,27 @@ export default function DataManagement() {
   const [isLoading, setIsLoading] = useState(true)
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   // 데이터셋 목록 불러오기
-  useEffect(() => {
-    const fetchDatasets = async () => {
-      try {
-        setIsLoading(true)
-        const data = await datasetApi.getAllDatasets()
-        setDatasets(data)
-      } catch (error) {
-        console.error("Error fetching datasets:", error)
-        toast({
-          title: "데이터 로드 오류",
-          description: "데이터셋 목록을 불러오는 중 오류가 발생했습니다.",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
-      }
+  const fetchDatasets = async () => {
+    try {
+      setIsLoading(true)
+      const data = await datasetApi.getAllDatasets()
+      setDatasets(data)
+    } catch (error) {
+      console.error("Error fetching datasets:", error)
+      toast({
+        title: "데이터 로드 오류",
+        description: "데이터셋 목록을 불러오는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchDatasets()
   }, [toast])
 
@@ -91,7 +99,8 @@ export default function DataManagement() {
       (item) =>
           item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.organization.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.datasetTheme.theme.toLowerCase().includes(searchTerm.toLowerCase()),
+          item.datasetTheme.theme.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.name.toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
   // 파일 업로드 처리
@@ -113,16 +122,31 @@ export default function DataManagement() {
 
     try {
       setIsUploading(true)
-      const response = await s3Api.uploadFile(file)
+
+      // FormData 생성
+      const formData = new FormData()
+      formData.append("file", file)
+
+      const response = await fetch("http://54.180.238.119:8080/s3/upload", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`업로드 실패: ${response.status}`)
+      }
+
+      const result = await response.text()
+      console.log("업로드 성공:", result)
 
       toast({
         title: "업로드 성공",
-        description: "파일이 성공적으로 업로드되었습니다.",
+        description: result,
       })
 
       // 데이터셋 목록 새로고침
-      const updatedDatasets = await datasetApi.getAllDatasets()
-      setDatasets(updatedDatasets)
+      fetchDatasets()
 
       // 파일 선택 초기화
       setFile(null)
@@ -135,6 +159,85 @@ export default function DataManagement() {
       })
     } finally {
       setIsUploading(false)
+    }
+  }
+
+  // 데이터 다운로드 처리
+  const handleDownloadDataset = async (datasetId: number, title: string) => {
+    try {
+      setIsProcessing(true)
+      console.log("데이터 다운로드 중...", datasetId)
+
+      const response = await fetch(`http://54.180.238.119:8080/data-set/download/${datasetId}`, {
+        method: "GET",
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`다운로드 실패: ${response.status}`)
+      }
+
+      // 파일 다운로드 처리
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `${title}.csv` // 파일명 설정
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast({
+        title: "다운로드 성공",
+        description: "데이터가 성공적으로 다운로드되었습니다.",
+      })
+
+      // 데이터셋 목록 새로고침 (다운로드 수 업데이트)
+      fetchDatasets()
+    } catch (error) {
+      console.error("다운로드 오류:", error)
+      toast({
+        title: "다운로드 오류",
+        description: "데이터를 다운로드하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // 데이터 삭제 처리
+  const handleDeleteDataset = async (resourceId: number, title: string) => {
+    try {
+      setIsProcessing(true)
+      console.log("데이터 삭제 중...", resourceId)
+
+      const response = await fetch(`http://54.180.238.119:8080/s3/delete/${resourceId}`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`삭제 실패: ${response.status}`)
+      }
+
+      toast({
+        title: "삭제 성공",
+        description: `"${title}" 데이터가 성공적으로 삭제되었습니다.`,
+      })
+
+      // 데이터셋 목록 새로고침
+      fetchDatasets()
+    } catch (error) {
+      console.error("삭제 오류:", error)
+      toast({
+        title: "삭제 오류",
+        description: "데이터를 삭제하는 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsProcessing(false)
     }
   }
 
@@ -160,8 +263,8 @@ export default function DataManagement() {
                   <div className="flex items-center gap-2">
                     <Input id="file" type="file" onChange={handleFileChange} className="flex-1" />
                   </div>
-                  <p className="text-xs text-muted-foreground">파일명 형식: [테마ID]_[데이터명]_[기관명]_[지역].[확장자]</p>
-                  <p className="text-xs text-muted-foreground">예시: 기후_평균최고기온_기상청_전국.csv </p>
+                  <p className="text-xs text-muted-foreground">파일명 형식: [테마]_[카테고리]_[기관명]_[지역].[확장자]</p>
+                  <p className="text-xs text-muted-foreground">예시: 기후_평균최고기온_기상청_전국.csv</p>
                 </div>
                 {file && (
                     <div className="rounded-md bg-green-50 p-3">
@@ -196,7 +299,7 @@ export default function DataManagement() {
         <div className="flex items-center space-x-2">
           <Search className="h-5 w-5 text-muted-foreground" />
           <Input
-              placeholder="검색어를 입력하세요"
+              placeholder="데이터 검색..."
               className="max-w-sm"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -241,13 +344,27 @@ export default function DataManagement() {
                         <TableCell className="font-medium">{item.title}</TableCell>
                         <TableCell>{item.organization}</TableCell>
                         <TableCell>{item.updateDate}</TableCell>
-                        <TableCell>{(item.view ?? 0).toLocaleString()}</TableCell>
-                        <TableCell>{(item.download ?? 0).toLocaleString()}</TableCell>
+                        <TableCell>{item.view.toLocaleString()}</TableCell>
+                        <TableCell>{item.download.toLocaleString()}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-blue-600 border-blue-200"
+                                onClick={() => handleDownloadDataset(item.datasetId, item.title)}
+                                disabled={isProcessing}
+                            >
+                              <Download className="h-4 w-4 mr-1" /> 다운로드
+                            </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm" className="h-8 text-red-600 border-red-200">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-red-600 border-red-200"
+                                    disabled={isProcessing}
+                                >
                                   <Trash2 className="h-4 w-4 mr-1" /> 삭제
                                 </Button>
                               </AlertDialogTrigger>
@@ -255,12 +372,17 @@ export default function DataManagement() {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>데이터 삭제</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    정말로 이 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                                    정말로 "{item.title}" 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>취소</AlertDialogCancel>
-                                  <AlertDialogAction className="bg-red-600 hover:bg-red-700">삭제</AlertDialogAction>
+                                  <AlertDialogAction
+                                      className="bg-red-600 hover:bg-red-700"
+                                      onClick={() => handleDeleteDataset(item.resource.resourceId, item.title)}
+                                  >
+                                    삭제
+                                  </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
                             </AlertDialog>
