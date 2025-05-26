@@ -42,7 +42,7 @@ export default function AdminDashboard() {
         })
         if (requestResponse.ok) {
           const requestData = await requestResponse.json()
-          setRequestStats(requestData)
+          setRequestStats(requestData.data)
         }
 
         // 데이터셋 통계 가져오기
@@ -52,7 +52,7 @@ export default function AdminDashboard() {
         })
         if (datasetResponse.ok) {
           const datasetData = await datasetResponse.json()
-          setDatasetStats(datasetData)
+          setDatasetStats(datasetData.data)
         }
 
         // 전체 데이터셋 수 가져오기
