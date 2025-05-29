@@ -1,5 +1,6 @@
 // API 기본 URL
-const API_BASE_URL = "http://54.180.238.119:8080"
+// const API_BASE_URL = "http://54.180.238.119:8080"
+const API_BASE_URL = "http://localhost:8082"
 
 // 사용자 관련 API
 export const userApi = {
@@ -105,6 +106,15 @@ export const datasetApi = {
   // 상위 9개 데이터셋 가져오기
   getTop9Datasets: async () => {
     const response = await fetch(`${API_BASE_URL}/data-set/top9`, {
+      method: "GET",
+      credentials: "include",
+    })
+    return response.json()
+  },
+
+  // 데이터셋 통계 가져오기
+  getDataStats: async () => {
+    const response = await fetch(`${API_BASE_URL}/data-set/stats`, {
       method: "GET",
       credentials: "include",
     })
@@ -458,4 +468,49 @@ export const requestApi = {
     })
     return response
   },
+}
+
+export const adminApi = {
+
+    // 계정 삭제
+    deleteAccountByAdmin: async () => {
+      const response = await fetch(`${API_BASE_URL}/admin/delete-user`, {
+        method: "DELETE",
+        credentials: "include",
+      })
+      return response.json()
+    },
+
+}
+
+
+export const statisticsApi = {
+
+    // 전체 사용자 및 증가비율
+    getUserStats: async () => {
+      const response = await fetch(`${API_BASE_URL}/statistics/user-stats`, {
+        method: "GET",
+        credentials: "include",
+      })
+      return response.json()
+    },
+
+    // 사용자 개요
+    getUserOverview: async () => {
+      const response = await fetch(`${API_BASE_URL}/statistics/user-overview`, {
+        method: "GET",
+        credentials: "include",
+      })
+      return response.json()
+    },
+
+    // 전체 유저
+    getAllUser: async () => {
+      const response = await fetch(`${API_BASE_URL}/statistics/all-user`, {
+        method: "GET",
+        credentials: "include",
+      })
+      return response.json()
+    },
+
 }
