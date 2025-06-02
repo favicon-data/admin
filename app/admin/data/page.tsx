@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -68,7 +66,7 @@ export default function DataManagement() {
   const [searchTerm, setSearchTerm] = useState("")
   const [datasets, setDatasets] = useState<Dataset[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = React.useState<File[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
 
@@ -77,7 +75,7 @@ export default function DataManagement() {
     try {
       setIsLoading(true)
       const data = await datasetApi.getAllDatasets()
-      setDatasets(data)
+      setDatasets(data.data)
     } catch (error) {
       console.error("Error fetching datasets:", error)
       toast({
@@ -105,13 +103,14 @@ export default function DataManagement() {
 
   // 파일 업로드 처리
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0])
+    if (e.target.files) {
+      // FileList를 배열로 변환하여 저장
+      setFiles(Array.from(e.target.files))
     }
   }
 
   const handleUpload = async () => {
-    if (!file) {
+    if (files.length === 0) {
       toast({
         title: "파일 선택 오류",
         description: "업로드할 파일을 선택해주세요.",
@@ -123,9 +122,12 @@ export default function DataManagement() {
     try {
       setIsUploading(true)
 
-      // FormData 생성
       const formData = new FormData()
-      formData.append("file", file)
+
+      // 여러 파일을 FormData에 모두 append
+      files.forEach(file => {
+        formData.append("files", file)
+      })
 
       const response = await fetch("http://54.180.238.119:8080/s3/upload", {
         method: "POST",
@@ -149,7 +151,7 @@ export default function DataManagement() {
       fetchDatasets()
 
       // 파일 선택 초기화
-      setFile(null)
+      setFiles([])
     } catch (error) {
       console.error("Error uploading file:", error)
       toast({
@@ -159,6 +161,19 @@ export default function DataManagement() {
       })
     } finally {
       setIsUploading(false)
+    }
+  }
+
+  const getThemeBadgeClass = (theme: string) => {
+    switch (theme) {
+      case "질병":
+        return "bg-red-100 text-red-800 border-red-200"
+      case "환경":
+        return "bg-green-100 text-green-800 border-green-200"
+      case "기후":
+        return "bg-blue-100 text-blue-800 border-blue-200"
+      default:
+        return "bg-gray-100 text-gray-800 border-gray-200"
     }
   }
 
@@ -261,15 +276,21 @@ export default function DataManagement() {
                 <div className="grid gap-2">
                   <Label htmlFor="file">파일 선택</Label>
                   <div className="flex items-center gap-2">
-                    <Input id="file" type="file" onChange={handleFileChange} className="flex-1" />
+                    <Input id="file" type="file" multiple onChange={handleFileChange} className="flex-1" />
                   </div>
                   <p className="text-xs text-muted-foreground">파일명 형식: [테마]_[카테고리]_[기관명]_[지역].[확장자]</p>
                   <p className="text-xs text-muted-foreground">예시: 기후_평균최고기온_기상청_전국.csv</p>
                 </div>
-                {file && (
+                {files && files.length > 0 && (
                     <div className="rounded-md bg-green-50 p-3">
-                      <p className="text-sm font-medium">선택된 파일: {file.name}</p>
-                      <p className="text-xs text-muted-foreground">크기: {(file.size / 1024).toFixed(2)} KB</p>
+                      {files.map((file, idx) => (
+                          <div key={idx}>
+                            <p className="text-sm font-medium">선택된 파일: {file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              크기: {(file.size / 1024).toFixed(2)} KB
+                            </p>
+                          </div>
+                      ))}
                     </div>
                 )}
               </div>
@@ -278,7 +299,7 @@ export default function DataManagement() {
                     type="submit"
                     onClick={handleUpload}
                     className="bg-green-800 hover:bg-green-900"
-                    disabled={isUploading || !file}
+                    disabled={isUploading || !files}
                 >
                   {isUploading ? (
                       <>
@@ -337,7 +358,7 @@ export default function DataManagement() {
                       <TableRow key={item.datasetId} className="hover:bg-green-50">
                         <TableCell>{item.datasetId}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="bg-green-50 text-green-800">
+                          <Badge variant="outline" className={`${getThemeBadgeClass(item.datasetTheme.theme)} border`}>
                             {item.datasetTheme.theme}
                           </Badge>
                         </TableCell>

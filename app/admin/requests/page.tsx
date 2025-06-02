@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CheckCircle, Eye, Search, XCircle, Loader2 } from "lucide-react"
+import { CheckCircle, Eye, Search, XCircle, Loader2, Download } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -79,7 +79,7 @@ export default function RequestsManagement() {
 
       const data = await response.json()
       console.log("Fetched requests:", data)
-      setRequests(data)
+      setRequests(data.data)
     } catch (error) {
       console.error("Error fetching requests:", error)
       toast({
@@ -249,6 +249,59 @@ export default function RequestsManagement() {
     }
   }
 
+  const handleDownload = async (requestId: number, title?: string) => {
+    try {
+      const response = await fetch(`http://54.180.238.119:8080/request/download/${requestId}`, {
+        method: "GET",
+        // 필요시 헤더 추가
+      });
+
+      if (!response.ok) {
+        throw new Error("파일 다운로드 실패");
+      }
+
+      const blob = await response.blob();
+
+      // 응답 헤더에서 파일명 추출 시도 (Content-Disposition)
+      const disposition = response.headers.get("Content-Disposition");
+      let filename = title || "downloaded_file";
+
+      if (disposition && disposition.indexOf("filename=") !== -1) {
+        const match = disposition.match(/filename="?(.+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      // 확장자가 없으면 .csv 붙이기 (예: myfile → myfile.csv)
+      if (!filename.toLowerCase().endsWith(".csv")) {
+        filename = filename + ".csv";
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "다운로드 성공",
+        description: `${filename} 파일이 다운로드되었습니다.`,
+        variant: "default",
+      });
+    } catch (error) {
+      toast({
+        title: "다운로드 오류",
+        description: "파일 다운로드 중 오류가 발생했습니다.",
+        variant: "destructive",
+      });
+    }
+  };
+
+
+
+
   // 상태 배지 표시
   const getStatusBadge = (status: RequestStatus) => {
     switch (status) {
@@ -356,6 +409,21 @@ export default function RequestsManagement() {
                             <TableCell>{getStatusBadge(item.reviewStatus)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 text-blue-700 border-blue-200"
+                                    disabled={!item.fileUrl}
+                                    onClick={() => {
+                                      if (item.fileUrl) {
+                                        // 다운로드 처리 함수 호출
+                                        handleDownload(item.dataRequestId, item.title)
+                                      }
+                                    }}
+                                    title={item.fileUrl ? "파일 다운로드" : "다운로드할 파일 없음"}
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
                                 <Dialog>
                                   <DialogTrigger asChild>
                                     <Button

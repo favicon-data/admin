@@ -87,8 +87,8 @@ export function RecentRequests({ requests = [], isLoading = false }: RecentReque
       <div className="space-y-8">
         {requests.map((request) => (
             <div key={request.dataRequestId} className="flex items-center">
-              <Avatar className="h-9 w-9 bg-green-100">
-                <AvatarFallback className="bg-green-100 text-green-800">
+              <Avatar className="h-9 w-9" style={{ backgroundColor: "#EAEDDB" }}>
+                <AvatarFallback style={{ backgroundColor: "#EAEDDB", color: "#1f2d20" }}>
                   {request.user.username ? request.user.username.charAt(0) : request.user.email.charAt(0)}
                 </AvatarFallback>
               </Avatar>

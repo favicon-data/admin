@@ -22,6 +22,16 @@ interface DatasetStats {
   }
 }
 
+interface UserStats {
+  total: number
+  rate: number
+}
+
+interface UserOverviewStats {
+  month: number
+  count: number
+}
+
 export default function AdminDashboard() {
   const [requestStats, setRequestStats] = useState<RequestStats | null>(null)
   const [datasetStats, setDatasetStats] = useState<DatasetStats | null>(null)
@@ -29,6 +39,11 @@ export default function AdminDashboard() {
   const [totalUsers, setTotalUsers] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [recentRequests, setRecentRequests] = useState<any[]>([])
+  const [userStats, setUserStats] = useState<UserStats | null>(null)
+  const [userRate, setUserRate] = useState<number | null>(null)
+  const [userOverviewStats, setUserOverviewStats] = useState<UserOverviewStats[] | null>(null)
+
+
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -58,18 +73,42 @@ export default function AdminDashboard() {
         // 전체 데이터셋 수 가져오기
         try {
           const countData = await datasetApi.getTotalDatasetCount()
-          setTotalDatasets(countData)
+          setTotalDatasets(countData.data)
         } catch (error) {
           console.error("데이터셋 수 조회 오류:", error)
         }
 
-        // 전체 사용자 수 가져오기
+        // 사용자 개요 통계 가져오기
         try {
-          const usersData = await userApi.getAllUsers()
-          setTotalUsers(usersData.length)
+          const userOverviewRes = await fetch("http://54.180.238.119:8080/statistics/user-overview", {
+            method: "GET",
+            credentials: "include",
+          })
+          if (userOverviewRes.ok) {
+            const overviewData = await userOverviewRes.json()
+            setUserOverviewStats(overviewData.data)
+          }
         } catch (error) {
-          console.error("사용자 수 조회 오류:", error)
+          console.error("사용자 개요 통계 오류:", error)
         }
+
+
+        // 사용자 통계 가져오기
+        try {
+          const userStatsResponse = await fetch("http://54.180.238.119:8080/statistics/user-stats", {
+            method: "GET",
+            credentials: "include",
+          })
+          if (userStatsResponse.ok) {
+            const userStatsData = await userStatsResponse.json()
+            setUserStats(userStatsData.data)
+            setTotalUsers(userStatsData.data.total)
+            setUserRate(userStatsData.data.rate)
+          }
+        } catch (error) {
+          console.error("사용자 통계 조회 오류:", error)
+        }
+
 
         // 최근 데이터 요청 가져오기
         try {
@@ -80,7 +119,7 @@ export default function AdminDashboard() {
           if (requestsResponse.ok) {
             const requestsData = await requestsResponse.json()
             // 최근 5개만 가져오기
-            setRecentRequests(requestsData.slice(0, 5))
+            setRecentRequests(requestsData.data.slice(0, 4))
           }
         } catch (error) {
           console.error("최근 요청 조회 오류:", error)
@@ -105,8 +144,8 @@ export default function AdminDashboard() {
 
   // 사용자 증가율 계산 (임시로 데이터셋 증가율의 절반으로 설정)
   const getUserGrowth = () => {
-    const datasetGrowth = getLatestDatasetGrowth()
-    return Math.round(datasetGrowth * 0.5) // 데이터셋 증가율의 절반으로 추정
+    //const datasetGrowth = getLatestDatasetGrowth()
+    return userRate !== null ? Math.round(userRate) : 0
   }
 
   return (
@@ -236,7 +275,7 @@ export default function AdminDashboard() {
               <CardDescription>지난 6개월 동안의 증가량 개요입니다.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Overview requestStats={requestStats} datasetStats={datasetStats} totalUsers={totalUsers} />
+              <Overview requestStats={requestStats} datasetStats={datasetStats} totalUsers={totalUsers} userOverviewStats={userOverviewStats}/>
             </CardContent>
           </Card>
           <Card className="col-span-3">

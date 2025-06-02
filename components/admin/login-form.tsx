@@ -39,8 +39,11 @@ export function LoginForm() {
 
   return (
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full">
-          <User className="h-4 w-4" />
+        <div
+            className="flex items-center gap-2 px-3 py-1 rounded-full"
+            style={{backgroundColor: "#9BBCA5", color: "#1f2d20"}}
+        >
+          <User className="h-4 w-4"/>
           <span className="text-sm font-medium">{user.email}</span>
         </div>
         <Button
