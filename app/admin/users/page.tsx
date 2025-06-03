@@ -22,11 +22,9 @@ import { useToast } from "@/components/ui/use-toast"
 interface User {
     userId: number
     email: string
-    username: string | null
-    role: number
+    username: string
 }
 
-// API 기본 URL
 const API_BASE_URL = "http://54.180.238.119:8080"
 
 export default function UsersManagement() {
@@ -37,23 +35,23 @@ export default function UsersManagement() {
     const [isProcessing, setIsProcessing] = useState(false)
     const [processingUserId, setProcessingUserId] = useState<number | null>(null)
 
-    // 사용자 목록 불러오기
     const fetchUsers = async () => {
         try {
             setIsLoading(true)
-            console.log("사용자 목록 불러오는 중...")
-
-            const response = await fetch(`${API_BASE_URL}/users/list`, {
+            const response = await fetch(`${API_BASE_URL}/statistics/all-user`, {
                 method: "GET",
                 credentials: "include",
             })
 
-            if (!response.ok) {
-                throw new Error(`API 요청 실패: ${response.status}`)
-            }
+            if (!response.ok) throw new Error(`API 요청 실패: ${response.status}`)
 
-            const data = await response.json()
-            console.log("사용자 목록 불러오기 성공:", data)
+            const json = await response.json()
+            const data: User[] = json.data.map((item: any[]) => ({
+                userId: item[0],
+                email: item[1],
+                username: item[2],
+            }))
+
             setUsers(data)
         } catch (error) {
             console.error("사용자 목록 불러오기 오류:", error)
@@ -71,38 +69,30 @@ export default function UsersManagement() {
         fetchUsers()
     }, [])
 
-    // 검색 필터링
     const filteredUsers = users.filter(
         (item) =>
             item.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (item.username && item.username.toLowerCase().includes(searchTerm.toLowerCase())),
+            item.username.toLowerCase().includes(searchTerm.toLowerCase()),
     )
 
-    // 사용자 삭제
     const handleDeleteUser = async (userId: number) => {
         try {
             setProcessingUserId(userId)
             setIsProcessing(true)
-            console.log("사용자 삭제 중...", userId)
 
-            const response = await fetch(`${API_BASE_URL}/users/delete-account/${userId}`, {
+            const response = await fetch(`${API_BASE_URL}/user/delete-account`, {
                 method: "DELETE",
                 credentials: "include",
             })
 
-            if (!response.ok) {
-                throw new Error(`API 요청 실패: ${response.status}`)
-            }
+            if (!response.ok) throw new Error(`API 요청 실패: ${response.status}`)
 
-            const data = await response.json()
-            console.log("사용자 삭제 성공:", data)
-
+            const result = await response.json()
             toast({
                 title: "사용자 삭제 성공",
-                description: "사용자가 성공적으로 삭제되었습니다.",
+                description: result.message || "사용자가 성공적으로 삭제되었습니다.",
             })
 
-            // 사용자 목록 새로고침
             fetchUsers()
         } catch (error) {
             console.error("사용자 삭제 오류:", error)
@@ -117,29 +107,12 @@ export default function UsersManagement() {
         }
     }
 
-    // 사용자 역할 표시
-    const getUserRoleBadge = (role: number) => {
-        if (role === 1) {
-            return <Badge className="bg-green-100 text-green-800 border-green-200">관리자</Badge>
-        } else {
-            return (
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    일반 사용자
-                </Badge>
-            )
-        }
-    }
-
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">사용자 관리</h1>
                     <p className="text-muted-foreground">시스템에 등록된 사용자를 관리합니다.</p>
-                </div>
-                <div className="flex items-center text-green-600 bg-green-50 px-3 py-2 rounded-md">
-                    <UserCog className="h-4 w-4 mr-2" />
-                    <span className="text-sm">관리자 모드</span>
                 </div>
             </div>
             <div className="flex items-center space-x-2">
@@ -158,14 +131,13 @@ export default function UsersManagement() {
                             <TableHead>ID</TableHead>
                             <TableHead>이메일</TableHead>
                             <TableHead>사용자명</TableHead>
-                            <TableHead>역할</TableHead>
                             <TableHead className="text-right">작업</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
+                                <TableCell colSpan={4} className="h-24 text-center">
                                     <div className="flex justify-center items-center">
                                         <Loader2 className="h-6 w-6 animate-spin text-green-800 mr-2" />
                                         데이터를 불러오는 중...
@@ -174,7 +146,7 @@ export default function UsersManagement() {
                             </TableRow>
                         ) : filteredUsers.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="h-24 text-center">
+                                <TableCell colSpan={4} className="h-24 text-center">
                                     검색 결과가 없습니다.
                                 </TableCell>
                             </TableRow>
@@ -183,13 +155,16 @@ export default function UsersManagement() {
                                 <TableRow key={item.userId} className="hover:bg-green-50">
                                     <TableCell>{item.userId}</TableCell>
                                     <TableCell className="font-medium">{item.email}</TableCell>
-                                    <TableCell>{item.username || "-"}</TableCell>
-                                    <TableCell>{getUserRoleBadge(item.role)}</TableCell>
+                                    <TableCell>{item.username}</TableCell>
                                     <TableCell className="text-right">
                                         <div className="flex justify-end gap-2">
                                             <AlertDialog>
                                                 <AlertDialogTrigger asChild>
-                                                    <Button variant="outline" size="sm" className="h-8 text-red-600 border-red-200">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="h-8 text-red-600 border-red-200"
+                                                    >
                                                         <Trash2 className="h-4 w-4 mr-1" /> 삭제
                                                     </Button>
                                                 </AlertDialogTrigger>
@@ -197,8 +172,7 @@ export default function UsersManagement() {
                                                     <AlertDialogHeader>
                                                         <AlertDialogTitle>사용자 삭제</AlertDialogTitle>
                                                         <AlertDialogDescription>
-                                                            정말로 이 사용자를 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 사용자의 모든 데이터가
-                                                            삭제됩니다.
+                                                            정말로 이 사용자를 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며 현재 로그인된 사용자의 계정만 삭제됩니다.
                                                         </AlertDialogDescription>
                                                     </AlertDialogHeader>
                                                     <AlertDialogFooter>

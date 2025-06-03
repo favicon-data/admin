@@ -3,7 +3,14 @@
 import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import {
   Dialog,
   DialogContent,
@@ -26,7 +33,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { UploadIcon as FileUpload, Plus, Search, Trash2, Download } from "lucide-react"
+import {
+  UploadIcon as FileUpload,
+  Plus,
+  Search,
+  Trash2,
+  Download,
+} from "lucide-react"
 import { datasetApi } from "@/lib/api"
 import { useToast } from "@/components/ui/use-toast"
 
@@ -66,11 +79,12 @@ export default function DataManagement() {
   const [searchTerm, setSearchTerm] = useState("")
   const [datasets, setDatasets] = useState<Dataset[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [files, setFiles] = React.useState<File[]>([])
+  const [files, setFiles] = useState<File[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 15
 
-  // 데이터셋 목록 불러오기
   const fetchDatasets = async () => {
     try {
       setIsLoading(true)
@@ -92,19 +106,24 @@ export default function DataManagement() {
     fetchDatasets()
   }, [toast])
 
-  // 검색 필터링
   const filteredDatasets = datasets.filter(
       (item) =>
           item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
           item.organization.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.datasetTheme.theme.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.name.toLowerCase().includes(searchTerm.toLowerCase()),
+          item.datasetTheme.theme
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase()) ||
+          item.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // 파일 업로드 처리
+  const totalPages = Math.ceil(filteredDatasets.length / itemsPerPage)
+  const paginatedDatasets = filteredDatasets.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+  )
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      // FileList를 배열로 변환하여 저장
       setFiles(Array.from(e.target.files))
     }
   }
@@ -123,9 +142,7 @@ export default function DataManagement() {
       setIsUploading(true)
 
       const formData = new FormData()
-
-      // 여러 파일을 FormData에 모두 append
-      files.forEach(file => {
+      files.forEach((file) => {
         formData.append("files", file)
       })
 
@@ -135,22 +152,12 @@ export default function DataManagement() {
         credentials: "include",
       })
 
-      if (!response.ok) {
-        throw new Error(`업로드 실패: ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`업로드 실패: ${response.status}`)
 
       const result = await response.text()
-      console.log("업로드 성공:", result)
+      toast({ title: "업로드 성공", description: result })
 
-      toast({
-        title: "업로드 성공",
-        description: result,
-      })
-
-      // 데이터셋 목록 새로고침
       fetchDatasets()
-
-      // 파일 선택 초기화
       setFiles([])
     } catch (error) {
       console.error("Error uploading file:", error)
@@ -177,27 +184,21 @@ export default function DataManagement() {
     }
   }
 
-  // 데이터 다운로드 처리
   const handleDownloadDataset = async (datasetId: number, title: string) => {
     try {
       setIsProcessing(true)
-      console.log("데이터 다운로드 중...", datasetId)
+      const response = await fetch(
+          `http://54.180.238.119:8080/data-set/download/${datasetId}`,
+          { method: "GET", credentials: "include" }
+      )
 
-      const response = await fetch(`http://54.180.238.119:8080/data-set/download/${datasetId}`, {
-        method: "GET",
-        credentials: "include",
-      })
+      if (!response.ok) throw new Error(`다운로드 실패: ${response.status}`)
 
-      if (!response.ok) {
-        throw new Error(`다운로드 실패: ${response.status}`)
-      }
-
-      // 파일 다운로드 처리
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `${title}.csv` // 파일명 설정
+      a.download = `${title}.csv`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -208,7 +209,6 @@ export default function DataManagement() {
         description: "데이터가 성공적으로 다운로드되었습니다.",
       })
 
-      // 데이터셋 목록 새로고침 (다운로드 수 업데이트)
       fetchDatasets()
     } catch (error) {
       console.error("다운로드 오류:", error)
@@ -222,27 +222,21 @@ export default function DataManagement() {
     }
   }
 
-  // 데이터 삭제 처리
   const handleDeleteDataset = async (resourceId: number, title: string) => {
     try {
       setIsProcessing(true)
-      console.log("데이터 삭제 중...", resourceId)
+      const response = await fetch(
+          `http://54.180.238.119:8080/s3/delete/${resourceId}`,
+          { method: "DELETE", credentials: "include" }
+      )
 
-      const response = await fetch(`http://54.180.238.119:8080/s3/delete/${resourceId}`, {
-        method: "DELETE",
-        credentials: "include",
-      })
-
-      if (!response.ok) {
-        throw new Error(`삭제 실패: ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`삭제 실패: ${response.status}`)
 
       toast({
         title: "삭제 성공",
         description: `"${title}" 데이터가 성공적으로 삭제되었습니다.`,
       })
 
-      // 데이터셋 목록 새로고침
       fetchDatasets()
     } catch (error) {
       console.error("삭제 오류:", error)
@@ -270,22 +264,33 @@ export default function DataManagement() {
             <DialogContent className="sm:max-w-[525px]">
               <DialogHeader>
                 <DialogTitle>새 데이터 추가</DialogTitle>
-                <DialogDescription>FAVICON 데이터 포털에 새로운 데이터 파일을 업로드합니다.</DialogDescription>
+                <DialogDescription>
+                  FAVICON 데이터 포털에 새로운 데이터 파일을 업로드합니다.
+                </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
                   <Label htmlFor="file">파일 선택</Label>
                   <div className="flex items-center gap-2">
-                    <Input id="file" type="file" multiple onChange={handleFileChange} className="flex-1" />
+                    <Input
+                        id="file"
+                        type="file"
+                        multiple
+                        onChange={handleFileChange}
+                        className="flex-1"
+                    />
                   </div>
-                  <p className="text-xs text-muted-foreground">파일명 형식: [테마]_[카테고리]_[기관명]_[지역].[확장자]</p>
-                  <p className="text-xs text-muted-foreground">예시: 기후_평균최고기온_기상청_전국.csv</p>
+                  <p className="text-xs text-muted-foreground">
+                    예시: 기후_평균최고기온_기상청_전국.csv
+                  </p>
                 </div>
-                {files && files.length > 0 && (
+                {files.length > 0 && (
                     <div className="rounded-md bg-green-50 p-3">
                       {files.map((file, idx) => (
                           <div key={idx}>
-                            <p className="text-sm font-medium">선택된 파일: {file.name}</p>
+                            <p className="text-sm font-medium">
+                              선택된 파일: {file.name}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               크기: {(file.size / 1024).toFixed(2)} KB
                             </p>
@@ -296,10 +301,9 @@ export default function DataManagement() {
               </div>
               <DialogFooter>
                 <Button
-                    type="submit"
                     onClick={handleUpload}
                     className="bg-green-800 hover:bg-green-900"
-                    disabled={isUploading || !files}
+                    disabled={isUploading}
                 >
                   {isUploading ? (
                       <>
@@ -317,6 +321,7 @@ export default function DataManagement() {
             </DialogContent>
           </Dialog>
         </div>
+
         <div className="flex items-center space-x-2">
           <Search className="h-5 w-5 text-muted-foreground" />
           <Input
@@ -326,6 +331,7 @@ export default function DataManagement() {
               onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+
         <div className="rounded-md border">
           <Table>
             <TableHeader className="bg-green-50">
@@ -347,18 +353,23 @@ export default function DataManagement() {
                       데이터를 불러오는 중...
                     </TableCell>
                   </TableRow>
-              ) : filteredDatasets.length === 0 ? (
+              ) : paginatedDatasets.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="h-24 text-center">
                       검색 결과가 없습니다.
                     </TableCell>
                   </TableRow>
               ) : (
-                  filteredDatasets.map((item) => (
+                  paginatedDatasets.map((item) => (
                       <TableRow key={item.datasetId} className="hover:bg-green-50">
                         <TableCell>{item.datasetId}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={`${getThemeBadgeClass(item.datasetTheme.theme)} border`}>
+                          <Badge
+                              variant="outline"
+                              className={`${getThemeBadgeClass(
+                                  item.datasetTheme.theme
+                              )} border`}
+                          >
                             {item.datasetTheme.theme}
                           </Badge>
                         </TableCell>
@@ -373,7 +384,9 @@ export default function DataManagement() {
                                 variant="outline"
                                 size="sm"
                                 className="h-8 text-blue-600 border-blue-200"
-                                onClick={() => handleDownloadDataset(item.datasetId, item.title)}
+                                onClick={() =>
+                                    handleDownloadDataset(item.datasetId, item.title)
+                                }
                                 disabled={isProcessing}
                             >
                               <Download className="h-4 w-4 mr-1" /> 다운로드
@@ -393,14 +406,19 @@ export default function DataManagement() {
                                 <AlertDialogHeader>
                                   <AlertDialogTitle>데이터 삭제</AlertDialogTitle>
                                   <AlertDialogDescription>
-                                    정말로 "{item.title}" 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+                                    정말로 "{item.title}" 데이터를 삭제하시겠습니까?
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>취소</AlertDialogCancel>
                                   <AlertDialogAction
                                       className="bg-red-600 hover:bg-red-700"
-                                      onClick={() => handleDeleteDataset(item.resource.resourceId, item.title)}
+                                      onClick={() =>
+                                          handleDeleteDataset(
+                                              item.resource.resourceId,
+                                              item.title
+                                          )
+                                      }
                                   >
                                     삭제
                                   </AlertDialogAction>
@@ -414,6 +432,69 @@ export default function DataManagement() {
               )}
             </TableBody>
           </Table>
+        </div>
+
+        {/* 페이징 */}
+        <div className="flex justify-center mt-4">
+          {filteredDatasets.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                >
+                  ⏮
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                >
+                  이전
+                </Button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(
+                        (page) =>
+                            page === 1 ||
+                            page === totalPages ||
+                            Math.abs(page - currentPage) <= 2
+                    )
+                    .map((page, i, arr) => (
+                        <React.Fragment key={page}>
+                          {i > 0 && page - arr[i - 1] > 1 && (
+                              <span className="px-1">...</span>
+                          )}
+                          <Button
+                              variant={page === currentPage ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(page)}
+                          >
+                            {page}
+                          </Button>
+                        </React.Fragment>
+                    ))}
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                        setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                    }
+                    disabled={currentPage === totalPages}
+                >
+                  다음
+                </Button>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                >
+                  ⏭
+                </Button>
+              </div>
+          )}
         </div>
       </div>
   )
