@@ -80,7 +80,7 @@ export default function UsersManagement() {
             setProcessingUserId(userId)
             setIsProcessing(true)
 
-            const response = await fetch(`${API_BASE_URL}/user/delete-account`, {
+            const response = await fetch(`${API_BASE_URL}/users/delete-account/${userId}`, {
                 method: "DELETE",
                 credentials: "include",
             })
